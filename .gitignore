@@ -1,0 +1,14 @@
+# Local environment variables
+.env
+
+# Streamlit secrets (for local testing)
+.streamlit/secrets.toml
+
+# Python artifacts
+__pycache__/
+*.pyc
+venv/
+env/
+
+# Large model files (Optional - YOLO will auto-download on HF/Streamlit Cloud)
+yolo11n.pt
