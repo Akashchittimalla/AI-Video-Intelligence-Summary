@@ -12,6 +12,6 @@ jobs:
           fetch-depth: 0
           lfs: true
       - name: Push to hub
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://Akashchittimalla99:$HF_TOKEN@huggingface.co/spaces/Akashchittimalla99/ai-video-intelligence main
+  env:
+    HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  run: git push --force https://Akashchittimalla99:$HF_TOKEN@huggingface.co/spaces/Akashchittimalla99/ai-video-intelligence main
