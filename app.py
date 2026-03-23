@@ -11,19 +11,22 @@ from ultralytics import YOLO
 
 # --- 1. SETUP & KEYS ---
 load_dotenv()
+# Supports both local .env and Hugging Face Secrets
 api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
 
 st.set_page_config(page_title="Vision Intelligence", page_icon="🎬", layout="wide")
 
 if not api_key:
-    st.error("⚠️ API Key missing! Set GOOGLE_API_KEY in .env or Secrets.")
+    st.error("⚠️ API Key missing! Set GOOGLE_API_KEY in Hugging Face Secrets or .env.")
     st.stop()
 
+# Initialize the new Google GenAI Client
 client = genai.Client(api_key=api_key)
 
 # --- 2. MODELS ---
 @st.cache_resource
 def load_yolo():
+    # Ensure yolo11n.pt is in your root directory
     return YOLO("yolo11n.pt")
 
 yolo_model = load_yolo()
@@ -37,46 +40,66 @@ def create_pdf_report(report_text):
     pdf.cell(200, 10, txt="Vision Intelligence Narrative Report", ln=True, align='C')
     pdf.ln(10)
     pdf.set_font("Arial", size=12)
-    # multi_cell wraps text automatically
+    # Using your original logic: encodes to latin-1 for the download buffer
     pdf.multi_cell(0, 10, txt=report_text)
     return pdf.output(dest='S').encode('latin-1')
 
 def process_yolo_stream(video_path, placeholder, conf):
     """Local YOLOv11 object tracking."""
     cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        st.error("Error opening video stream.")
+        return
+
     while cap.isOpened():
         ret, frame = cap.read()
-        if not ret: break
+        if not ret: 
+            break
+        
+        # Run YOLO inference
         results = yolo_model(frame, conf=conf)
         annotated = results[0].plot()
+        
+        # Display the frame in Streamlit
         placeholder.image(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB), use_container_width=True)
+    
     cap.release()
 
 def generate_ai_narrative(video_path):
-    """Gemini 2.5 Flash narrative with 429 Retry Logic."""
+    """Gemini 2.0 Flash narrative with 429 Retry Logic."""
     max_retries = 3
     delay = 10
+    
     for i in range(max_retries):
         try:
             with st.status(f"AI Analyzing (Attempt {i+1})...") as status:
+                # Upload to Gemini File API
                 video_file = client.files.upload(file=video_path)
+                
                 while video_file.state.name == "PROCESSING":
                     time.sleep(2)
                     video_file = client.files.get(name=video_file.name)
                 
-                # Using the latest stable thinking model
+                # Using the stable 2.0 Flash model
                 response = client.models.generate_content(
                     model="gemini-2.0-flash",
-                    contents=[video_file, "Analyze this video. List actions with timestamps and a summary."]
+                    contents=[
+                        video_file, 
+                        "Analyze this video. List actions with timestamps and provide a professional summary."
+                    ]
                 )
+                
+                # Cleanup: Delete file from Gemini cloud after processing
                 client.files.delete(name=video_file.name)
                 return response.text
+                
         except Exception as e:
             if "429" in str(e) and i < max_retries - 1:
                 st.warning(f"Rate limited. Retrying in {delay}s...")
                 time.sleep(delay)
                 delay *= 2
-            else: raise e
+            else: 
+                raise e
 
 # --- 4. MAIN INTERFACE ---
 st.sidebar.title("🛠️ Controls")
@@ -87,15 +110,17 @@ st.title("🎬 Vision Intelligence Dashboard")
 uploaded_file = st.file_uploader("Upload Video Asset", type=["mp4", "mov", "avi"])
 
 if uploaded_file:
+    # Use a temporary file to store the upload for processing
     with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp:
         tmp.write(uploaded_file.read())
         video_path = tmp.name
-
+    
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("Visual Analysis")
         placeholder = st.empty()
+        
         if tracking_on:
             if st.button("▶️ Start Tracking"):
                 process_yolo_stream(video_path, placeholder, conf_level)
@@ -110,9 +135,20 @@ if uploaded_file:
             st.markdown(report)
         
         if 'report' in st.session_state:
-            pdf_data = create_pdf_report(st.session_state['report'])
-            st.download_button("📥 Download PDF Report", pdf_data, "report.pdf", "application/pdf")
+            # Generate the PDF buffer for download
+            try:
+                pdf_data = create_pdf_report(st.session_state['report'])
+                st.download_button(
+                    label="📥 Download PDF Report",
+                    data=pdf_data,
+                    file_name="vision_report.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(f"PDF Error: {e}. Narrative text may contain unsupported characters.")
 
-    os.remove(video_path)
+    # Cleanup local temp file
+    if os.path.exists(video_path):
+        os.remove(video_path)
 else:
-    st.info("Upload a video to start.")
+    st.info("Please upload a video to begin analysis.")
