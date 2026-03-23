@@ -66,7 +66,7 @@ def generate_ai_narrative(video_path):
                 
                 # Using the latest stable thinking model
                 response = client.models.generate_content(
-                    model="gemini-flash-latest",
+                    model="gemini-2.0-flash",
                     contents=[video_file, "Analyze this video. List actions with timestamps and a summary."]
                 )
                 client.files.delete(name=video_file.name)

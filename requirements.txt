@@ -4,5 +4,5 @@ ultralytics
 google-genai
 python-dotenv
 pandas
-fpdf
+fpdf2
 google-generativeai
