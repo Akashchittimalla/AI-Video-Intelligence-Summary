@@ -1,0 +1,26 @@
+# --- Python and Virtual Environments ---
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Streamlit and App Caches ---
+.streamlit/
+! .streamlit/config.toml
+static/
+.cache/
+
+# --- IDE and OS Junk ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# --- Large Files / Models (Optional Backup) ---
+# We track these with LFS, but it's good practice to keep 
+# raw model downloads or massive logs out of Git history.
+*.pt.tmp
+*.mp4.tmp
